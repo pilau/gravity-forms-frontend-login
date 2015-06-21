@@ -157,6 +157,7 @@ if ( class_exists("GFForms") ) {
 			// Create the credentials array
 			$creds['user_login'] = $entry[1];
 			$creds['user_password'] = $entry[2];
+			$creds['remember'] = $entry[3];
 
 			// Sign in the user and set them as the logged-in user
 			$sign = wp_signon( $creds );
