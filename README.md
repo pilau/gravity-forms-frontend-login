@@ -13,3 +13,6 @@ Note that the plugin folder should be named `gravity-forms-frontend-login`. This
 * When activated, if the login and lost password forms aren't present, they'll be imported.
 * Don't change the titles of the forms - many actions are taken based on recognising the form by its title.
 * Likewise, don't remove the default classes for the fields.
+* Settings (under _Forms > Settings > Frontend Login_) include:
+	* Roles to be blocked from the admin area
+	* The page to redirect blocked users to

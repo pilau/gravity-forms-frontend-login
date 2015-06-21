@@ -53,7 +53,10 @@ if ( class_exists("GFForms") ) {
 
 			// Add hooks
 			add_filter( 'gform_field_validation', array( $this, 'validate_form' ), 10, 4 );
-			add_action( "gform_after_submission", array( $this, 'log_user_in' ), 10, 2 );
+			add_action( 'gform_after_submission', array( $this, 'log_user_in' ), 10, 2 );
+
+			// Check for admin blocking
+			$this->block_admin();
 
 		}
 
@@ -93,6 +96,88 @@ if ( class_exists("GFForms") ) {
 
 			}
 
+		}
+
+		/**
+		 * Load the plugin text domain for translation.
+		 *
+		 * @since	1.0.0
+		 * @return	array
+		 */
+		public function plugin_settings_fields() {
+
+			// Prepare roles for checkbox choices
+			$role_choices = array();
+			foreach ( get_editable_roles() as $role => $role_details ) {
+				$role_choices[] = array(
+					'label'			=> $role_details['name'],
+					'name'			=> 'fel_roles_no_admin_access_' . $role,
+					'default_value'	=> 0,
+				);
+			}
+
+			// Prepare pages for select choices
+			$page_choices = array();
+			foreach ( get_pages() as $page ) {
+				$label = $page->post_title;
+				// Simple indenting
+				if ( $page->post_parent ) {
+					$label = '- ' . $label;
+				}
+				$page_choices[] = array(
+					'label'		=> $label,
+					'value'		=> $page->ID,
+				);
+			}
+
+			return array(
+				array(
+					"fields" => array(
+						array(
+							"name"		=> "fel_roles_no_admin_access",
+							"tooltip"	=> __( "Roles selected here will be blocked from the admin area. By default they will be redirected to the home page, but another page can be selected below." ),
+							"label"		=> __( "Roles with no admin access", $this->_slug ),
+							"type"		=> "checkbox",
+							"choices"	=> $role_choices,
+						),
+						array(
+							"name"			=> "fel_admin_redirect",
+							"tooltip"		=> __( "If roles are selected above to be blocked, they'll be redirected to this page if they try to access the admin area.", $this->_slug ),
+							"label"			=> __( "Admin redirect", $this->_slug ),
+							"type"			=> "select",
+							"default_value"	=> get_option( 'page_on_front' ),
+							"choices"		=> $page_choices,
+						),
+					)
+				)
+			);
+		}
+
+		/**
+		 * Block certain roles from the admin
+		 *
+		 * @since	1.0.0
+		 * @return	void
+		 */
+		public function block_admin() {
+
+			if ( is_admin() && ! ( defined( 'DOING_AJAX' ) && DOING_AJAX ) ) {
+
+				// Get settings
+				$settings = $this->get_plugin_settings();
+
+				// Get current user's role
+				$user = wp_get_current_user();
+				$role = $user->roles[0];
+
+				// Blocked?
+				if ( ! empty( $settings[ 'fel_roles_no_admin_access_' . $role ] ) ) {
+					$redirect = empty( $settings['fel_admin_redirect'] ) ? home_url() : get_permalink( $settings['fel_admin_redirect'] );
+					wp_redirect( $redirect );
+					exit;
+				}
+
+			}
 		}
 
 		/**
