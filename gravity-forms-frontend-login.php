@@ -54,8 +54,10 @@ if ( class_exists("GFForms") ) {
 			// Add hooks
 			add_filter( 'gform_field_validation', array( $this, 'validate_form' ), 10, 4 );
 			add_action( 'gform_after_submission', array( $this, 'log_user_in' ), 10, 2 );
+			add_action( 'gform_after_submission', array( $this, 'remove_form_entry' ), 20, 2 );
+			add_action( 'admin_notices', array( $this, 'admin_notices' ) );
 
-			// Check for admin blocking
+			// Any actions to be taken on the init hook (this method is hooked to init already)
 			$this->block_admin();
 
 		}
@@ -111,7 +113,7 @@ if ( class_exists("GFForms") ) {
 			foreach ( get_editable_roles() as $role => $role_details ) {
 				$role_choices[] = array(
 					'label'			=> $role_details['name'],
-					'name'			=> 'fel_roles_no_admin_access_' . $role,
+					'name'			=> 'roles_no_admin_access_' . $role,
 					'default_value'	=> 0,
 				);
 			}
@@ -134,19 +136,53 @@ if ( class_exists("GFForms") ) {
 				array(
 					"fields" => array(
 						array(
-							"name"		=> "fel_roles_no_admin_access",
+							"name"		=> "roles_no_admin_access",
 							"tooltip"	=> __( "Roles selected here will be blocked from the admin area. By default they will be redirected to the home page, but another page can be selected below." ),
 							"label"		=> __( "Roles with no admin access", $this->_slug ),
 							"type"		=> "checkbox",
 							"choices"	=> $role_choices,
 						),
 						array(
-							"name"			=> "fel_admin_redirect",
+							"name"			=> "admin_redirect",
 							"tooltip"		=> __( "If roles are selected above to be blocked, they'll be redirected to this page if they try to access the admin area.", $this->_slug ),
 							"label"			=> __( "Admin redirect", $this->_slug ),
 							"type"			=> "select",
 							"default_value"	=> get_option( 'page_on_front' ),
 							"choices"		=> $page_choices,
+						),
+						array(
+							"name"			=> "keep_entries_pilau_frontend_login",
+							"label"			=> __( "Keep entries for login form?", $this->_slug ),
+							"type"			=> "radio",
+							"horizontal"	=> true,
+							"default_value"	=> "yes",
+							"choices"		=> array(
+								array(
+									'label'			=> __( "Yes", $this->_slug ),
+									'value'			=> 'yes',
+								),
+								array(
+									'label'			=> __( "No", $this->_slug ),
+									'value'			=> 'no',
+								),
+							)
+						),
+						array(
+							"name"			=> "keep_entries_pilau_lost_password",
+							"label"			=> __( "Keep entries for lost password form?", $this->_slug ),
+							"type"			=> "radio",
+							"horizontal"	=> true,
+							"default_value"	=> "no",
+							"choices"		=> array(
+								array(
+									'label'			=> __( "Yes", $this->_slug ),
+									'value'			=> 'yes',
+								),
+								array(
+									'label'			=> __( "No", $this->_slug ),
+									'value'			=> 'no',
+								),
+							)
 						),
 					)
 				)
@@ -171,13 +207,98 @@ if ( class_exists("GFForms") ) {
 				$role = $user->roles[0];
 
 				// Blocked?
-				if ( ! empty( $settings[ 'fel_roles_no_admin_access_' . $role ] ) ) {
-					$redirect = empty( $settings['fel_admin_redirect'] ) ? home_url() : get_permalink( $settings['fel_admin_redirect'] );
+				if ( ! empty( $settings[ 'roles_no_admin_access_' . $role ] ) ) {
+					$redirect = empty( $settings['admin_redirect'] ) ? home_url() : get_permalink( $settings['admin_redirect'] );
 					wp_redirect( $redirect );
 					exit;
 				}
 
 			}
+		}
+
+		/**
+		 * Admin notices
+		 *
+		 * @since	1.0.0
+		 * @return void
+		 */
+		public function admin_notices() {
+			$screen = get_current_screen();
+
+			if ( $screen->id == 'forms_page_gf_entries' ) {
+
+				// Get form
+				$form = GFAPI::get_form( $_REQUEST['id'] );
+
+				if ( ! $this->form_should_keep_entries( $form['title'] ) ) { ?>
+					<div class="error">
+						<p><?php printf( __( '<strong>NOTE:</strong> This form is currently set to not retain entries. To change this, head over to the %1$ssettings page%2$s.' ), '<a href="' . admin_url( 'admin.php?page=gf_settings&subview=gffrontendlogin' ) . '">', '</a>' ); ?></p>
+					</div>
+				<?php }
+
+			}
+
+		}
+
+		/**
+		 * Automatically remove form entry?
+		 *
+		 * @since	1.0.0
+		 * @link	https://gist.github.com/intelliweb/7460525
+		 * @return	void
+		 */
+		public function remove_form_entry( $entry, $form ) {
+			global $wpdb;
+
+			if ( in_array( $form['title'], self::$form_titles && ! $this->form_should_keep_entries( $form['title'] ) ) ) {
+
+				$lead_id = $entry['id'];
+				$lead_table = RGFormsModel::get_lead_table_name();
+				$lead_notes_table = RGFormsModel::get_lead_notes_table_name();
+				$lead_detail_table = RGFormsModel::get_lead_details_table_name();
+				$lead_detail_long_table = RGFormsModel::get_lead_details_long_table_name();
+
+				// Delete from detail long
+				$wpdb->query( $wpdb->prepare( " DELETE FROM $lead_detail_long_table
+					WHERE lead_detail_id IN(
+						SELECT id FROM $lead_detail_table WHERE lead_id = %d
+					)", $lead_id ) );
+
+				// Delete from lead details
+				$wpdb->query( $wpdb->prepare( "DELETE FROM $lead_detail_table WHERE lead_id = %d", $lead_id ) );
+
+				// Delete from lead notes
+				$wpdb->query( $wpdb->prepare("DELETE FROM $lead_notes_table WHERE lead_id=%d", $lead_id ) );
+
+				// Delete from lead
+				$wpdb->query( $wpdb->prepare("DELETE FROM $lead_table WHERE id = %d", $lead_id ) );
+
+			}
+
+		}
+
+		/**
+		 * Check if a form is set to keep entries or not
+		 *
+		 * @since	1.0.0
+		 * @param	string	$title
+		 * @return	bool
+		 */
+		private function form_should_keep_entries( $title ) {
+			$keep = true;
+
+			// Prepare form title to match setting
+			$form_slug = str_replace( '-', '_', sanitize_title( $title ) );
+
+			// Get settings
+			$settings = $this->get_plugin_settings();
+
+			// Is this form set to not keep entries?
+			if ( isset( $settings[ 'keep_entries_' . $form_slug ] ) && $settings[ 'keep_entries_' . $form_slug ] == 'no' ) {
+				$keep = false;
+			}
+
+			return $keep;
 		}
 
 		/**
