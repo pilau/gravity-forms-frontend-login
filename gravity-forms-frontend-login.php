@@ -250,7 +250,7 @@ if ( class_exists("GFForms") ) {
 		public function remove_form_entry( $entry, $form ) {
 			global $wpdb;
 
-			if ( in_array( $form['title'], self::$form_titles && ! $this->form_should_keep_entries( $form['title'] ) ) ) {
+			if ( in_array( $form['title'], self::$form_titles ) && ! $this->form_should_keep_entries( $form['title'] ) ) {
 
 				$lead_id = $entry['id'];
 				$lead_table = RGFormsModel::get_lead_table_name();
