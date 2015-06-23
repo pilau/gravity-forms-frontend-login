@@ -2,7 +2,7 @@
 
 A Gravity Forms add-on to provide frontend login functionality.
 
-**NOTE:** Depends on the [Gravity Forms](https://github.com/gyrus/WordPress-Developers-Custom-Fields) plugin.
+**NOTE:** Depends on the [Gravity Forms](http://www.gravityforms.com/) plugin.
 
 ## Installation
 
@@ -10,12 +10,12 @@ Note that the plugin folder should be named `gravity-forms-frontend-login`. This
 
 ## Usage notes
 
-* When activated, if the login and lost password forms aren't present, they'll be imported.
-* Don't change the titles of the forms - many actions are taken based on recognising the form by its title.
+* When activated, if the login form isn't present, it'll be imported.
+* Don't change the titles of the form - many actions are taken based on recognising the form by its title.
 * Likewise, don't remove the default classes for the fields.
 * Settings (under _Forms > Settings > Frontend Login_) include:
 	* Roles to be blocked from the admin area
 	* The page to redirect blocked users to
-	* Whether or not to keep entries for the login (defaults to yes) and lost password (default to no) forms.
-* Place the login and lost password forms where you need them.
-* Use the User Registration add-on for registration.
+	* Whether or not to keep entries for the login form (defaults to yes).
+* Place the login form where you need them.
+* Use the User Registration add-on for registration and profile updating.

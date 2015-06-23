@@ -40,7 +40,8 @@ if ( class_exists("GFForms") ) {
 		protected $_full_path = __FILE__;
 		protected $_title = "Gravity Forms Frontend Login";
 		protected $_short_title = "Frontend Login";
-		protected static $form_titles = array( 'Pilau frontend login', 'Pilau lost password' );
+		//protected static $form_titles = array( 'Pilau frontend login', 'Pilau lost password' );
+		protected static $form_titles = array( 'Pilau frontend login' );
 
 		/**
 		 * Initialise
@@ -52,10 +53,11 @@ if ( class_exists("GFForms") ) {
 			parent::init();
 
 			// Add hooks
-			add_filter( 'gform_field_validation', array( $this, 'validate_form' ), 10, 4 );
-			add_action( 'gform_after_submission', array( $this, 'log_user_in' ), 10, 2 );
+			add_filter( 'gform_field_validation', array( $this, 'field_validation' ), 10, 4 );
+			add_action( 'gform_after_submission', array( $this, 'after_submission' ), 10, 2 );
 			add_action( 'gform_after_submission', array( $this, 'remove_form_entry' ), 20, 2 );
 			add_action( 'admin_notices', array( $this, 'admin_notices' ) );
+			add_filter( 'login_url', array( $this, 'login_url' ), 9999, 2 );
 
 			// Any actions to be taken on the init hook (this method is hooked to init already)
 			$this->block_admin();
@@ -151,6 +153,13 @@ if ( class_exists("GFForms") ) {
 							"choices"		=> $page_choices,
 						),
 						array(
+							"name"			=> "login_page",
+							"label"			=> __( "Login page", $this->_slug ),
+							"type"			=> "select",
+							"default_value"	=> get_option( 'page_on_front' ),
+							"choices"		=> $page_choices,
+						),
+						array(
 							"name"			=> "keep_entries_pilau_frontend_login",
 							"label"			=> __( "Keep entries for login form?", $this->_slug ),
 							"type"			=> "radio",
@@ -167,6 +176,7 @@ if ( class_exists("GFForms") ) {
 								),
 							)
 						),
+						/*
 						array(
 							"name"			=> "keep_entries_pilau_lost_password",
 							"label"			=> __( "Keep entries for lost password form?", $this->_slug ),
@@ -184,6 +194,7 @@ if ( class_exists("GFForms") ) {
 								),
 							)
 						),
+						*/
 					)
 				)
 			);
@@ -302,16 +313,16 @@ if ( class_exists("GFForms") ) {
 		}
 
 		/**
-		 * Validate login
+		 * Field validation
 		 *
 		 * @since	1.0.0
-		 * @param	array	$result	The validation result to be filtered
+		 * @param	array	$result		The validation result to be filtered
 		 * @param	mixed	$value		The field value to be validated.
 		 * @param	object	$form
 		 * @param	object	$field
 		 * @return	array
 		 */
-		public function validate_form( $result, $value, $form, $field ) {
+		public function field_validation( $result, $value, $form, $field ) {
 			global $user;
 
 			switch ( $form['title'] ) {
@@ -339,36 +350,54 @@ if ( class_exists("GFForms") ) {
 					break;
 				}
 
-				// Lost password form
-				case 'Pilau lost password': {
-
-					break;
-				}
-
 			}
 
 			return $result;
 		}
 
 		/**
-		 * Log user in after form submission
+		 * After submission actions
 		 *
 		 * @since	1.0.0
 		 * @param	array	$entry
 		 * @param	object	$form
 		 * @return	array
 		 */
-		public function log_user_in( $entry, $form ) {
+		public function after_submission( $entry, $form ) {
 
-			// Create the credentials array
-			$creds['user_login'] = $entry[1];
-			$creds['user_password'] = $entry[2];
-			$creds['remember'] = $entry[3];
+			switch ( $form['title'] ) {
 
-			// Sign in the user and set them as the logged-in user
-			$sign = wp_signon( $creds );
-			wp_set_current_user( $sign->ID );
+				// Login form
+				case 'Pilau frontend login': {
 
+					// Create the credentials array
+					$creds[ 'user_login' ] = $entry[ 1 ];
+					$creds[ 'user_password' ] = $entry[ 2 ];
+					$creds[ 'remember' ] = $entry[ 3 ];
+
+					// Sign in the user and redirect
+					$sign = wp_signon( $creds );
+					wp_set_current_user( $sign->ID );
+					wp_redirect( apply_filters( 'login_redirect', home_url() ) );
+					exit;
+
+				}
+
+			}
+
+		}
+
+		/**
+		 * Filter login URL
+		 *
+		 * @since	1.0.0
+		 * @param	string		$login_url
+		 * @param	string		$redirect
+		 * @return	string
+		 */
+		public function login_url( $login_url, $redirect ) {
+			$settings = $this->get_plugin_settings();
+			return get_permalink( $settings['login_page'] );
 		}
 
 	}
