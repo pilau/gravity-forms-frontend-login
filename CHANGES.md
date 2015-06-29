@@ -5,6 +5,7 @@
 * Made sure password fields are never stored in entries (keys in on `password` in CSS class for field)
 * Added `get_field_by_meta()`
 * Added `delete_entry_data()`
+* Added option to not redirect admin logins
 
 ## 1.0.0 (2015-06-23)
 * First version

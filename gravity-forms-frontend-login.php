@@ -159,6 +159,24 @@ if ( class_exists("GFForms") ) {
 							"choices"		=> $page_choices,
 						),
 						array(
+							"name"			=> "login_page_not_if_admin",
+							"label"			=> __( "Let admin logins use WP login page?", $this->_slug ),
+							"tooltip"		=> __( "Admin logins are detected based on whether the user tried to first access the URLs /admin, /wp-admin, or if there's no referrer to wp-login.php", $this->_slug ),
+							"type"			=> "radio",
+							"horizontal"	=> true,
+							"default_value"	=> "yes",
+							"choices"		=> array(
+								array(
+									'label'			=> __( "Yes", $this->_slug ),
+									'value'			=> 'yes',
+								),
+								array(
+									'label'			=> __( "No", $this->_slug ),
+									'value'			=> 'no',
+								),
+							)
+						),
+						array(
 							"name"			=> "keep_entries_pilau_frontend_login",
 							"label"			=> __( "Keep entries for login form?", $this->_slug ),
 							"type"			=> "radio",
@@ -383,7 +401,13 @@ if ( class_exists("GFForms") ) {
 		 */
 		public function login_url( $login_url, $redirect ) {
 			$settings = $this->get_plugin_settings();
-			return get_permalink( $settings['login_page'] );
+
+			// Redirect to frontend login page?
+			if ( strpos( $_SERVER['REQUEST_URI'], 'wp-admin' ) === false || ( isset( $settings['login_page_not_if_admin'] ) && $settings['login_page_not_if_admin'] == 'no' ) ) {
+				$login_url = get_permalink( $settings['login_page'] );
+			}
+
+			return $login_url;
 		}
 
 		/**
