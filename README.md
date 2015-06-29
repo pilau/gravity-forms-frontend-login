@@ -16,6 +16,7 @@ Note that the plugin folder should be named `gravity-forms-frontend-login`. This
 * Settings (under _Forms > Settings > Frontend Login_) include:
 	* Roles to be blocked from the admin area
 	* The page to redirect blocked users to
-	* Whether or not to keep entries for the login form (defaults to yes).
+	* Whether or not to keep entries for each form.
+		* NOTE: Always make sure the password field in any form includes the CSS class `password` - this will make sure password values are never stored in Gravity Forms entry data.
 * Place the login form where you need them.
 * Use the User Registration add-on for registration and profile updating.

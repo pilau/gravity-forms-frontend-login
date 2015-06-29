@@ -55,7 +55,6 @@ if ( class_exists("GFForms") ) {
 			// Add hooks
 			add_filter( 'gform_field_validation', array( $this, 'field_validation' ), 10, 4 );
 			add_action( 'gform_after_submission', array( $this, 'after_submission' ), 10, 2 );
-			add_action( 'gform_after_submission', array( $this, 'remove_form_entry' ), 20, 2 );
 			add_action( 'admin_notices', array( $this, 'admin_notices' ) );
 			add_filter( 'login_url', array( $this, 'login_url' ), 9999, 2 );
 
@@ -252,43 +251,6 @@ if ( class_exists("GFForms") ) {
 		}
 
 		/**
-		 * Automatically remove form entry?
-		 *
-		 * @since	1.0.0
-		 * @link	https://gist.github.com/intelliweb/7460525
-		 * @return	void
-		 */
-		public function remove_form_entry( $entry, $form ) {
-			global $wpdb;
-
-			if ( in_array( $form['title'], self::$form_titles ) && ! $this->form_should_keep_entries( $form['title'] ) ) {
-
-				$lead_id = $entry['id'];
-				$lead_table = RGFormsModel::get_lead_table_name();
-				$lead_notes_table = RGFormsModel::get_lead_notes_table_name();
-				$lead_detail_table = RGFormsModel::get_lead_details_table_name();
-				$lead_detail_long_table = RGFormsModel::get_lead_details_long_table_name();
-
-				// Delete from detail long
-				$wpdb->query( $wpdb->prepare( " DELETE FROM $lead_detail_long_table
-					WHERE lead_detail_id IN(
-						SELECT id FROM $lead_detail_table WHERE lead_id = %d
-					)", $lead_id ) );
-
-				// Delete from lead details
-				$wpdb->query( $wpdb->prepare( "DELETE FROM $lead_detail_table WHERE lead_id = %d", $lead_id ) );
-
-				// Delete from lead notes
-				$wpdb->query( $wpdb->prepare("DELETE FROM $lead_notes_table WHERE lead_id=%d", $lead_id ) );
-
-				// Delete from lead
-				$wpdb->query( $wpdb->prepare("DELETE FROM $lead_table WHERE id = %d", $lead_id ) );
-
-			}
-
-		}
-
-		/**
 		 * Check if a form is set to keep entries or not
 		 *
 		 * @since	1.0.0
@@ -364,6 +326,30 @@ if ( class_exists("GFForms") ) {
 		 * @return	array
 		 */
 		public function after_submission( $entry, $form ) {
+			global $wpdb;
+
+			/*
+			 * Remove form entries if necessary
+			 * @link	https://gist.github.com/intelliweb/7460525
+			 */
+
+			// First of all, never keep password fields
+			$password_field = $this->get_field_by_meta( $form, 'cssClass', 'password' );
+			$password_value = null;
+			if ( $password_field ) {
+				$password_value = $entry[ $password_field->id ];
+				$entry[ $password_field->id ] = '';
+				$this->delete_entry_data( $entry['id'], $password_field->id );
+			}
+
+			// Now check about removing the whole entry
+			if ( in_array( $form['title'], self::$form_titles ) && ! $this->form_should_keep_entries( $form['title'] ) ) {
+				$this->delete_entry_data( $entry['id'] );
+			}
+
+			/*
+			 * Any other submission actions?
+			 */
 
 			switch ( $form['title'] ) {
 
@@ -372,7 +358,7 @@ if ( class_exists("GFForms") ) {
 
 					// Create the credentials array
 					$creds[ 'user_login' ] = $entry[ 1 ];
-					$creds[ 'user_password' ] = $entry[ 2 ];
+					$creds[ 'user_password' ] = $password_value;
 					$creds[ 'remember' ] = $entry[ 3 ];
 
 					// Sign in the user and redirect
@@ -398,6 +384,109 @@ if ( class_exists("GFForms") ) {
 		public function login_url( $login_url, $redirect ) {
 			$settings = $this->get_plugin_settings();
 			return get_permalink( $settings['login_page'] );
+		}
+
+		/**
+		 * Return a field from a form object, based on a field meta value
+		 *
+		 * @since	1.1.0
+		 * @param	array	$form
+		 * @param	string	$field_meta_key
+		 * @param	string	$field_meta_value
+		 * @param	string	$checked_nested		Check this nested array of fields, e.g. 'inputs'
+		 * @return	mixed						If $checked_nested, returns an array in the format:
+		 * 										array( $field, [key of nested field] )
+		 */
+		private function get_field_by_meta( $form, $field_meta_key, $field_meta_value, $checked_nested = null ) {
+			$the_field = false;
+			$got_it = false;
+
+			// Try to find field
+			if ( isset( $form['fields'] ) && is_array( $form['fields'] ) ) {
+				foreach ( $form['fields'] as $field ) {
+					foreach ( $field as $key => $value ) {
+						if ( $key == $checked_nested && is_array( $value ) ) {
+
+							// Go through nested fields
+							foreach ( $value as $nested_key => $nested_value ) {
+								if ( array_key_exists( $field_meta_key, $nested_value ) && $nested_value[ $field_meta_key ] == $field_meta_value ) {
+									$the_field = array( $field, $nested_key );
+									$got_it = true;
+								}
+							}
+							if ( $got_it ) {
+								break;
+							}
+
+						} else if ( $key == $field_meta_key && $field_meta_value == $value ) {
+
+							// Got it
+							$the_field = $field;
+							$got_it = true;
+							break;
+
+						}
+					}
+					if ( $got_it ) {
+						break;
+					}
+				}
+			}
+
+			return $the_field;
+		}
+
+		/**
+		 * Delete entry data (all for lead, or just one field)
+		 *
+		 * @since	1.1.0
+		 * @param	int		$lead_id
+		 * @param	int		$field_id
+		 * @return	void
+		 */
+		private function delete_entry_data( $lead_id, $field_id = null ) {
+			global $wpdb;
+
+			// Get table names
+			$lead_table = RGFormsModel::get_lead_table_name();
+			$lead_notes_table = RGFormsModel::get_lead_notes_table_name();
+			$lead_detail_table = RGFormsModel::get_lead_details_table_name();
+			$lead_detail_long_table = RGFormsModel::get_lead_details_long_table_name();
+
+			if ( $field_id ) {
+
+				// Only delete data related to specified field
+
+				// Delete from detail long
+				$wpdb->query( $wpdb->prepare( " DELETE FROM $lead_detail_long_table
+					WHERE lead_detail_id IN(
+						SELECT id FROM $lead_detail_table WHERE lead_id = %d AND field_number = %d
+					)", $lead_id, $field_id ) );
+
+				// Delete from lead details
+				$wpdb->query( $wpdb->prepare( "DELETE FROM $lead_detail_table WHERE lead_id = %d AND field_number = %d", $lead_id, $field_id ) );
+
+			} else {
+
+				// Delete all data related to entry/lead
+
+				// Delete from detail long
+				$wpdb->query( $wpdb->prepare( " DELETE FROM $lead_detail_long_table
+					WHERE lead_detail_id IN(
+						SELECT id FROM $lead_detail_table WHERE lead_id = %d
+					)", $lead_id ) );
+
+				// Delete from lead details
+				$wpdb->query( $wpdb->prepare( "DELETE FROM $lead_detail_table WHERE lead_id = %d", $lead_id ) );
+
+				// Delete from lead notes
+				$wpdb->query( $wpdb->prepare("DELETE FROM $lead_notes_table WHERE lead_id=%d", $lead_id ) );
+
+				// Delete from lead
+				$wpdb->query( $wpdb->prepare("DELETE FROM $lead_table WHERE id = %d", $lead_id ) );
+
+			}
+
 		}
 
 	}
