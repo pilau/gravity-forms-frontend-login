@@ -6,6 +6,7 @@
 * Added `get_field_by_meta()`
 * Added `delete_entry_data()`
 * Added option to not redirect admin logins
+* Rewritten to use bootstrap class
 
 ## 1.0.0 (2015-06-23)
 * First version
