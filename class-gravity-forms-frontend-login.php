@@ -10,7 +10,7 @@ if ( class_exists("GFForms") ) {
 
 	class GFFrontendLogin extends GFAddOn {
 
-		protected $_version = "1.0.0";
+		protected $_version = "1.1.0";
 		protected $_min_gravityforms_version = "1.8.22";
 		protected $_slug = "gffrontendlogin";
 		protected $_path = "pilau-gravity-forms-frontend-login/gravity-forms-frontend-login.php";

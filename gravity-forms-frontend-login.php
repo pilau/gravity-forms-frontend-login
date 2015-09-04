@@ -4,7 +4,7 @@
 Plugin Name: Gravity Forms Frontend Login
 Plugin URI: https://github.com/pilau/gravity-forms-frontend-login
 Description: A Gravity Forms add-on to provide frontend login functionality.
-Version: 1.0.0
+Version: 1.1.0
 Author: Steve Taylor
 Author URI: http://sltaylor.co.uk
 

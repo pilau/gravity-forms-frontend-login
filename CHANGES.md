@@ -1,6 +1,6 @@
 # Changelog for Pilau Gravity Forms Frontend Login
 
-## 1.1.0 (????-??-??)
+## 1.1.0 (2015-09-04)
 * Moved entry removal code to `after_submission()`, otherwise login redirect could bypass it
 * Made sure password fields are never stored in entries (keys in on `password` in CSS class for field)
 * Added `get_field_by_meta()`
